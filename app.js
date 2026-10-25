@@ -210,7 +210,10 @@ function burst(parent, x, y, items, n = 10, spread = 220, cls = '') {
     p.style.setProperty('--dx', Math.cos(ang) * dist + 'px');
     p.style.setProperty('--dy', Math.sin(ang) * dist + 'px');
     p.style.setProperty('--r', rand(-180, 180) + 'deg');
-    p.addEventListener('animationend', () => { p.remove(); liveParticles--; });
+    // Remove no fim da animação; o timer garante a limpeza se a animação não terminar.
+    const sai = () => { if (p.isConnected) { p.remove(); liveParticles--; } };
+    p.addEventListener('animationend', sai);
+    setTimeout(sai, 2500);
     liveParticles++;
     parent.appendChild(p);
   }
@@ -294,6 +297,7 @@ const JOGOS = [
   { e: '🎹', nome: 'Música', cor: '#66bb6a', fn: () => musica },
   { e: '🙈', nome: 'Cadê?', cor: '#ffb300', fn: () => cade },
   { e: '🚗', nome: 'Carrinho', cor: '#5c6bc0', fn: () => carrinho },
+  { e: '💥', nome: 'Derruba', cor: '#ef5350', fn: () => derruba },
 ];
 
 function menu(s) {
@@ -830,6 +834,275 @@ function carrinho(s) {
     clearInterval(convite);
     ronco.gain.setTargetAtTime(0, a.currentTime, 0.05);
     motor.stop(a.currentTime + 0.3);
+  };
+}
+
+/* ---------- Jogo 7: Derruba! (canhão; causa-efeito, persistência) ---------- */
+// Torre de cubinhos no centro e canhão "de frente" embaixo: a bola voa para dentro
+// da tela e explode no ponto tocado, espalhando os cubos. Caiu tudo -> torre nova.
+const TORRES = [
+  { // listras gelo e rosa
+    cores: { a: '#7dd3fc', b: '#f472b6' },
+    linhas: ['aaaaaaa', 'aaaaaaa', 'bbbbbbb', 'aaaaaaa', 'aaaaaaa', 'bbbbbbb', 'aaaaaaa', 'aaaaaaa', 'bbbbbbb', 'aaaaaaa'],
+  },
+  { // pirâmide arco-íris
+    cores: { r: '#ef4444', o: '#f97316', y: '#facc15', g: '#22c55e', b: '#3b82f6', p: '#a855f7' },
+    linhas: ['    p    ', '   bbb   ', '  ggggg  ', ' yyyyyyy ', 'ooooooooo', 'rrrrrrrrr'],
+  },
+  { // coração
+    cores: { r: '#f43f5e', p: '#fda4af' },
+    linhas: [' rr rr ', 'rpprrrr', 'rpprrrr', 'rrrrrrr', ' rrrrr ', '  rrr  ', '   r   ', '   r   ', '   r   '],
+  },
+  { // castelo
+    cores: { c: '#a78bfa', d: '#7c3aed', y: '#fde047' },
+    linhas: ['c c c c c', 'ccccccccc', 'cdcccccdc', 'ccccycccc', 'cdcccccdc', 'ccccccccc', 'ccccccccc', 'ccc   ccc', 'ccc   ccc'],
+  },
+  { // cubo de gelo
+    cores: { a: '#bae6fd', b: '#38bdf8', w: '#f0f9ff' },
+    linhas: ['awaaaaaa', 'aabbbbaa', 'abaaaaba', 'abawaaba', 'abaaaaba', 'abaaaaba', 'aabbbbaa', 'aaaaaaaa'],
+  },
+  { // duas torres
+    cores: { y: '#facc15', p: '#c084fc' },
+    linhas: ['yyy   ppp', 'yyy   ppp', 'ppp   yyy', 'ppp   yyy', 'yyy   ppp', 'yyy   ppp', 'ppp   yyy', 'ppp   yyy', 'yyy   ppp', 'yyy   ppp'],
+  },
+];
+
+function derruba(s) {
+  s.classList.add('g-derruba');
+  const cv = el('canvas');
+  s.appendChild(cv);
+  homeButton(s);
+  const g = cv.getContext('2d');
+  const { Engine, Bodies, Body, Composite, Sleeping } = Matter;
+
+  const W = s.clientWidth, H = s.clientHeight, U = Math.min(W, H) / 100; // U = 1vmin
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const DT = 1000 / 60;
+  const engine = Engine.create({ enableSleeping: true, positionIterations: 8, velocityIterations: 6 });
+  const world = engine.world;
+  const L = 6.5 * U;                  // lado do cubinho
+  const MESA = H - 20 * U;            // topo da mesinha
+  const AREIA = H - 6 * U;
+  const NOTAS = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760];
+  const canhao = { x: W / 2, y: H - 2 * U, ang: -Math.PI / 2, recuo: 0 };
+
+  let cubos = [], mesa = null, voos = [], derrubados = 0, estado = 'jogando', torreIdx = -1;
+  let ultimaQueda = 0, ultimoTiro = 0, ultimoToque = performance.now(), ultimaNota = 0;
+  const timers = new Set();
+  const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
+
+  function novaTorre() {
+    cubos.forEach(b => Composite.remove(world, b));
+    if (mesa) Composite.remove(world, mesa.corpo);
+    cubos = []; derrubados = 0;
+    let i;
+    do { i = Math.floor(Math.random() * TORRES.length); } while (i === torreIdx);
+    torreIdx = i;
+    const t = TORRES[i];
+    const cols = Math.max(...t.linhas.map(l => l.length));
+    const largura = (cols + 0.6) * L;
+    mesa = { w: largura, h: 2.4 * U };
+    mesa.corpo = Bodies.rectangle(W / 2, MESA + mesa.h / 2, largura, mesa.h, { isStatic: true, friction: 0.8 });
+    const agora = performance.now();
+    const x0 = W / 2 - (cols - 1) * L / 2;
+    t.linhas.forEach((linha, li) => {
+      const row = t.linhas.length - 1 - li; // a última linha do desenho fica em cima da mesa
+      [...linha].forEach((ch, col) => {
+        if (ch === ' ') return;
+        const b = Bodies.rectangle(x0 + col * L, MESA - L / 2 - row * L, L, L,
+          { friction: 0.6, restitution: 0.1, density: 0.001 });
+        b.cor = t.cores[ch];
+        b.nasce = agora + row * 90 + col * 15; // monta de baixo para cima
+        // Dormindo, a torre fica parada (mesmo com "buracos") até o primeiro tiro.
+        Sleeping.set(b, true);
+        cubos.push(b);
+      });
+    });
+    Composite.add(world, [mesa.corpo, ...cubos]);
+    estado = 'jogando';
+    ultimaQueda = agora;
+  }
+
+  function atirar(tx, ty) {
+    const agora = performance.now();
+    if (agora - ultimoTiro < 250) return;
+    ultimoTiro = agora;
+    // Mira assistida: vai no cubinho em pé mais perto do toque.
+    let perto = null, menor = Infinity;
+    for (const b of cubos) {
+      if (b.caiu) continue;
+      const d = Math.hypot(b.position.x - tx, b.position.y - ty);
+      if (d < menor) { menor = d; perto = b; }
+    }
+    if (perto) { tx = perto.position.x; ty = perto.position.y; }
+    canhao.ang = Math.atan2(ty - canhao.y, tx - canhao.x);
+    canhao.recuo = 1;
+    const bx = canhao.x + Math.cos(canhao.ang) * 13 * U, by = canhao.y + Math.sin(canhao.ang) * 13 * U;
+    voos.push({ x0: bx, y0: by, x1: tx, y1: ty, t0: agora, dur: 380, cor: pick(['#1e3a8a', '#7c3aed', '#be185d', '#0f766e']) });
+    tone(120, { dur: 0.25, to: 45, vol: 0.5 });
+    tone(70, { dur: 0.15, to: 40, type: 'square', vol: 0.1 });
+    burst(s, bx, by, ['💨'], 2, 40);
+  }
+
+  // POW: joga para cima e para fora os cubinhos perto do ponto atingido,
+  // num arco que leva eles para fora da mesinha.
+  function explodir(x, y) {
+    const R = 2.4 * L;
+    for (const b of cubos) {
+      const dx = b.position.x - x, dy = b.position.y - y, d = Math.hypot(dx, dy);
+      Sleeping.set(b, false);
+      if (d > R) continue;
+      const k = 1 - d / R;
+      // para o lado em que já está; o cubo atingido em cheio vai para fora do centro da mesa
+      const lado = Math.abs(dx) > L * 0.3 ? Math.sign(dx) : Math.sign(b.position.x - W / 2) || pick([-1, 1]);
+      Body.setVelocity(b, { x: lado * (7 + 9 * k) + rand(-1.5, 1.5), y: -(5 + 9 * k) + dy * 0.05 });
+      Body.setAngularVelocity(b, rand(-0.35, 0.35));
+    }
+    tone(90, { dur: 0.35, to: 40, vol: 0.45 });
+    sfx.pop();
+    burst(s, x, y, ['#ffffff', '#fde047', '#fb7185', '#7dd3fc', '💥'], 14, 9 * U);
+  }
+
+  function vitoria() {
+    estado = 'festa';
+    sfx.tada();
+    say('Uau! Derrubou tudo!');
+    for (let i = 0; i < 4; i++) {
+      later(() => burst(s, rand(W * 0.25, W * 0.75), rand(H * 0.15, H * 0.5),
+        ['#ef4444', '#facc15', '#3b82f6', '#22c55e', '⭐', '🎉'], 16, 30 * U), i * 250);
+    }
+    later(novaTorre, 2600);
+  }
+
+  function verificar(t) {
+    for (const b of cubos) {
+      if (b.caiu) continue;
+      const p = b.position;
+      // Saiu da mesa (caindo ou voando para o lado) = derrubado, e deixa de ser alvo.
+      const naMesa = Math.abs(p.x - W / 2) < mesa.w / 2 + L * 0.2;
+      if (p.y < MESA + L * 0.6 && naMesa) continue;
+      b.caiu = true;
+      derrubados++;
+      ultimaQueda = t;
+      if (t - ultimaNota > 60) { // uma notinha que sobe conforme a torre vai caindo
+        ultimaNota = t;
+        tone(NOTAS[Math.min(NOTAS.length - 1, Math.floor(derrubados / cubos.length * NOTAS.length))], { dur: 0.3, vol: 0.12 });
+      }
+    }
+    const total = cubos.length;
+    if (estado === 'jogando' && total && (derrubados === total ||
+      (derrubados >= total * 0.85 && t - ultimaQueda > 4000))) vitoria();
+    for (const b of cubos) {
+      if (!b.fora && (b.position.y > H + 4 * L || b.position.x < -4 * L || b.position.x > W + 4 * L)) {
+        Composite.remove(world, b);
+        b.fora = true;
+      }
+    }
+  }
+
+  function cubo(b, t) {
+    const k = Math.min(1, Math.max(0, (t - b.nasce) / 300));
+    if (!k || b.fora) return;
+    const sc = 1 + 2.2 * Math.pow(k - 1, 3) + 1.2 * Math.pow(k - 1, 2); // surge com um pulinho
+    const h = L / 2 - 0.3 * U;
+    g.save();
+    g.translate(b.position.x, b.position.y);
+    g.rotate(b.angle);
+    g.scale(sc, sc);
+    g.fillStyle = b.cor;
+    g.beginPath(); g.roundRect(-h, -h, 2 * h, 2 * h, 0.9 * U); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.45)'; // brilho de cubo de gelo
+    g.beginPath(); g.roundRect(-h + 0.6 * U, -h + 0.6 * U, h, 0.9 * U, 0.45 * U); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.12)';
+    g.fillRect(-h, h - 0.9 * U, 2 * h, 0.9 * U);
+    g.restore();
+  }
+
+  function desenhar(t) {
+    g.clearRect(0, 0, W, H);
+    // mesinha
+    if (mesa) {
+      g.fillStyle = '#92400e';
+      g.fillRect(W / 2 - 1.6 * U, MESA, 3.2 * U, AREIA - MESA);
+      g.beginPath(); g.ellipse(W / 2, AREIA, 8 * U, 2 * U, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#b45309';
+      g.beginPath(); g.roundRect(W / 2 - mesa.w / 2, MESA, mesa.w, mesa.h, 1.2 * U); g.fill();
+      g.fillStyle = '#7c3aed';
+      g.fillRect(W / 2 - mesa.w / 2, MESA + mesa.h - 0.7 * U, mesa.w, 0.7 * U);
+    }
+    for (const b of cubos) cubo(b, t);
+    // areia (os cubinhos caem "atrás" dela)
+    g.fillStyle = '#fcd34d';
+    g.fillRect(0, AREIA, W, H - AREIA);
+    g.fillStyle = '#fbbf24';
+    g.fillRect(0, AREIA, W, 0.8 * U);
+    // bolas em voo: vão diminuindo, como se fossem para dentro da tela
+    voos = voos.filter(v => {
+      const k = (t - v.t0) / v.dur;
+      if (k >= 1) { explodir(v.x1, v.y1); return false; }
+      const x = v.x0 + (v.x1 - v.x0) * k;
+      const y = v.y0 + (v.y1 - v.y0) * k - Math.sin(k * Math.PI) * 6 * U;
+      const r = (5 - 2.6 * k) * U;
+      g.fillStyle = v.cor;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.55)';
+      g.beginPath(); g.arc(x - r * 0.35, y - r * 0.35, r * 0.3, 0, Math.PI * 2); g.fill();
+      return true;
+    });
+    canhaoDesenho();
+  }
+
+  function canhaoDesenho() {
+    const { x, y } = canhao;
+    canhao.recuo *= 0.86;
+    g.save();
+    g.translate(x, y);
+    g.rotate(canhao.ang);
+    g.translate(-canhao.recuo * 3 * U, 0);
+    g.fillStyle = '#1d4ed8';
+    g.beginPath(); g.roundRect(-2 * U, -5 * U, 16 * U, 10 * U, 4 * U); g.fill();
+    g.fillStyle = '#facc15';
+    g.beginPath(); g.roundRect(11.5 * U, -5.8 * U, 3 * U, 11.6 * U, 1.4 * U); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.3)';
+    g.beginPath(); g.roundRect(0, -3.6 * U, 10 * U, 2 * U, 1 * U); g.fill();
+    g.restore();
+    g.fillStyle = '#1e3a8a';
+    g.beginPath(); g.ellipse(x, y + 2 * U, 11 * U, 6 * U, 0, Math.PI, 0); g.fill();
+  }
+
+  let raf = 0, acc = 0, last = performance.now();
+  function loop(t) {
+    acc += Math.min(100, t - last);
+    last = t;
+    while (acc >= DT) { Engine.update(engine, DT); acc -= DT; }
+    verificar(t);
+    desenhar(t);
+    if (t - ultimoToque > 6000) { ultimoToque = t; canhao.recuo = 0.6; sfx.boing(); } // convite
+    raf = requestAnimationFrame(loop);
+  }
+
+  s.addEventListener('pointerdown', e => {
+    ultimoToque = performance.now();
+    atirar(e.clientX, e.clientY);
+  });
+  let resizeT = 0;
+  const onResize = () => { clearTimeout(resizeT); resizeT = setTimeout(() => show(derruba), 300); };
+  window.addEventListener('resize', onResize);
+
+  novaTorre();
+  say('Toque para atirar!');
+  raf = requestAnimationFrame(loop);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    timers.forEach(clearTimeout);
+    clearTimeout(resizeT);
+    window.removeEventListener('resize', onResize);
+    Engine.clear(engine);
   };
 }
 

@@ -12,6 +12,7 @@ Funciona **sem internet** depois de instalado, em tela cheia e deitado (paisagem
 | 🎨 | **Pintar** — pintar com o dedo; as bolinhas de cor falam o nome da cor | cores, coordenação motora |
 | 🎹 | **Música** — xilofone colorido; arrastar o dedo toca várias notas | causa e efeito, música |
 | 🚗 | **Carrinho** — toca em qualquer lugar e o carrinho vai até lá; chegando na casa, escola, vaca… ele fala onde chegou. Tocar no carrinho buzina e troca de veículo (ônibus, bombeiro, trator, ambulância) | causa e efeito, noção de espaço, vocabulário |
+| 💥 | **Derruba** — uma torre de cubinhos coloridos e um canhão: cada toque atira (a mira ajuda a acertar sempre) e os cubos voam. Derrubou tudo? Festa e uma torre nova aparece sozinha | causa e efeito, persistência, cores |
 | 🙈 | **Cadê?** — toca na cortina, ela sobe e aparece um bicho ou brinquedo: "Achou o gato!" | permanência do objeto (esconde-esconde) |
 
 Não existe "errar": todo toque dá som, cor e animação.
@@ -42,6 +43,10 @@ Depois abra http://localhost:8765.
 ## Sons
 
 Gravações reais com licença livre do Wikimedia Commons — autores e licenças em [sons/CREDITOS.md](sons/CREDITOS.md).
+
+## Bibliotecas
+
+- [Matter.js](https://brm.io/matter-js/) 0.20.0 (física do jogo Derruba) — licença MIT, em [lib/](lib/).
 
 ## Atualizações
 

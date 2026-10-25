@@ -1,5 +1,5 @@
 // Guarda todos os arquivos no aparelho para o app funcionar sem internet.
-const CACHE = 'bebe-brinca-v3';
+const CACHE = 'bebe-brinca-v4';
 const SONS = ['abelha', 'cachorro', 'cavalo', 'coruja', 'elefante', 'galinha', 'gato',
   'leao', 'macaco', 'ovelha', 'pato', 'porco', 'sapo', 'vaca'].map(n => `sons/${n}.mp3`);
 const FILES = [
@@ -8,6 +8,7 @@ const FILES = [
   'index.html',
   'style.css',
   'app.js',
+  'lib/matter.min.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
@@ -15,7 +16,12 @@ const FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' ignora o cache HTTP do navegador, para não guardar uma versão velha.
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(FILES.map(f => new Request(f, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -33,7 +39,7 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.open(CACHE).then(async cache => {
       const hit = await cache.match(e.request, { ignoreSearch: true });
-      const net = fetch(e.request)
+      const net = fetch(e.request.url, { cache: 'no-cache' })
         .then(res => {
           if (res.ok) cache.put(e.request, res.clone());
           return res;
