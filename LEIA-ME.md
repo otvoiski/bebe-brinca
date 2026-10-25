@@ -26,7 +26,7 @@ Não existe "errar": todo toque dá som, cor e animação.
 
 O app precisa estar num endereço `https://` uma vez para ser instalado (depois funciona offline).
 
-1. No tablet, abra o endereço do app no **Chrome**.
+1. No tablet, abra **https://otvoiski.github.io/bebe-brinca/** no **Chrome**.
 2. Menu ⋮ → **Instalar app** (ou "Adicionar à tela inicial").
 3. Abra pelo ícone "Bebê Brinca" na tela inicial — abre em tela cheia, sem barra do navegador.
 
