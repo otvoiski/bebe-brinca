@@ -293,6 +293,7 @@ const JOGOS = [
   { e: '🎨', nome: 'Pintar', cor: '#ab47bc', fn: () => pintar },
   { e: '🎹', nome: 'Música', cor: '#66bb6a', fn: () => musica },
   { e: '🙈', nome: 'Cadê?', cor: '#ffb300', fn: () => cade },
+  { e: '🚗', nome: 'Carrinho', cor: '#5c6bc0', fn: () => carrinho },
 ];
 
 function menu(s) {
@@ -677,6 +678,159 @@ function cade(s) {
     portas.appendChild(w);
   });
   return () => timers.forEach(clearTimeout);
+}
+
+/* ---------- Jogo 6: Carrinho (causa-efeito, espaço "aqui/lá", lugares) ---------- */
+function carrinho(s) {
+  s.classList.add('g-carro');
+  s.innerHTML = `
+    <svg class="estrada" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <path d="M-5 60 C 15 35, 35 80, 55 55 S 85 30, 105 50"/>
+      <path class="faixa" d="M-5 60 C 15 35, 35 80, 55 55 S 85 30, 105 50"/>
+    </svg>`;
+  homeButton(s);
+
+  const LUGARES = [
+    { e: '🏠', a: 'a', n: 'casa', x: 0.2, y: 0.3 },
+    { e: '🏫', a: 'a', n: 'escola', x: 0.52, y: 0.24 },
+    { e: '🌳', a: 'a', n: 'árvore', x: 0.84, y: 0.26 },
+    { id: 'vaca', e: '🐮', a: 'a', n: 'vaca', s: 'muuu', x: 0.16, y: 0.82 },
+    { e: '🎡', a: 'o', n: 'parque', x: 0.5, y: 0.86 },
+    { id: 'cachorro', e: '🐶', a: 'o', n: 'cachorro', s: 'au au', x: 0.84, y: 0.8 },
+  ];
+  LUGARES.forEach(l => {
+    if (l.id) carregarSom(l.id);
+    l.el = el('div', 'lugar', `<span class="emoji">${l.e}</span>`);
+    l.el.style.left = l.x * 100 + '%';
+    l.el.style.top = l.y * 100 + '%';
+    s.appendChild(l.el);
+  });
+
+  // O emoji dos veículos olha para a esquerda; vira quando anda para a direita.
+  const VEICULOS = [
+    { e: '🚗', a: 'o', n: 'carro', som: 'buzina' },
+    { e: '🚌', a: 'o', n: 'ônibus', som: 'buzina' },
+    { e: '🚒', a: 'o', n: 'caminhão de bombeiro', som: 'sirene' },
+    { e: '🚜', a: 'o', n: 'trator', som: 'buzina' },
+    { e: '🚑', a: 'a', n: 'ambulância', som: 'sirene' },
+  ];
+  let vi = 0;
+  const carro = el('div', 'carro', '<div class="flip"><span class="v emoji"></span></div>');
+  const flip = carro.firstChild, v = flip.firstChild;
+  v.textContent = VEICULOS[vi].e;
+  s.appendChild(carro);
+  const alvoEl = el('div', 'alvo');
+
+  const vmin = () => Math.min(s.clientWidth, s.clientHeight) / 100;
+  const pos = { x: s.clientWidth * 0.5, y: s.clientHeight * 0.6 };
+  let alvo = null, rastro = 0, ultimoToque = Date.now(), raf = 0, last = performance.now();
+
+  // Motor: um ronco grave que só aparece enquanto o carro anda.
+  const a = audio();
+  const motor = a.createOscillator(), filtro = a.createBiquadFilter(), ronco = a.createGain();
+  motor.type = 'sawtooth';
+  motor.frequency.value = 55;
+  filtro.type = 'lowpass';
+  filtro.frequency.value = 380;
+  ronco.gain.value = 0;
+  motor.connect(filtro); filtro.connect(ronco); ronco.connect(master);
+  motor.start();
+
+  function buzinar(veiculo) {
+    if (veiculo.som === 'sirene') {
+      [0, 0.45].forEach(d => {
+        tone(650, { dur: 0.22, to: 950, vol: 0.14, delay: d, type: 'triangle' });
+        tone(950, { dur: 0.22, to: 650, vol: 0.14, delay: d + 0.22, type: 'triangle' });
+      });
+    } else {
+      tone(420, { dur: 0.14, type: 'square', vol: 0.12 });
+      tone(420, { dur: 0.18, type: 'square', vol: 0.12, delay: 0.2 });
+    }
+  }
+
+  function chegou() {
+    alvoEl.remove();
+    const r = 16 * vmin();
+    const perto = LUGARES.find(l =>
+      Math.hypot(l.x * s.clientWidth - pos.x, l.y * s.clientHeight - pos.y) < r);
+    if (!perto) { sfx.boing(); return; }
+    restart(perto.el, 'hit');
+    burst(s, perto.x * s.clientWidth, perto.y * s.clientHeight, ['⭐', '✨', '💛'], 8);
+    if (perto.id) falarAnimal(perto);
+    else { sfx.tada(); say(`Chegamos ${perto.a === 'a' ? 'na' : 'no'} ${perto.n}!`); }
+  }
+
+  function loop(t) {
+    const dt = Math.min(0.05, (t - last) / 1000);
+    last = t;
+    let velocidade = 0;
+    if (alvo) {
+      const dx = alvo.x - pos.x, dy = alvo.y - pos.y, d = Math.hypot(dx, dy);
+      if (d < 3) {
+        pos.x = alvo.x; pos.y = alvo.y;
+        alvo = null;
+        carro.classList.remove('andando');
+        chegou();
+      } else {
+        velocidade = Math.min(520, 90 + d * 3); // freia perto do destino
+        const passo = Math.min(d, velocidade * dt);
+        pos.x += dx / d * passo;
+        pos.y += dy / d * passo;
+        if (Math.abs(dx) > 2) flip.style.setProperty('--f', dx > 0 ? -1 : 1);
+        rastro += passo;
+        if (rastro > 90) {
+          rastro = 0;
+          const atras = dx > 0 ? -7 : 7;
+          burst(s, pos.x + atras * vmin(), pos.y - 2 * vmin(), ['💨'], 1, 25);
+        }
+      }
+    }
+    ronco.gain.setTargetAtTime(velocidade ? 0.07 : 0, a.currentTime, 0.08);
+    motor.frequency.setTargetAtTime(55 + velocidade * 0.12, a.currentTime, 0.1);
+    carro.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+    raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+
+  s.addEventListener('pointerdown', e => {
+    ultimoToque = Date.now();
+    const m = 9 * vmin();
+    alvo = {
+      x: Math.min(s.clientWidth - m, Math.max(m, e.clientX)),
+      y: Math.min(s.clientHeight - 2 * vmin(), Math.max(18 * vmin(), e.clientY)),
+    };
+    alvoEl.style.left = alvo.x + 'px';
+    alvoEl.style.top = alvo.y + 'px';
+    s.appendChild(alvoEl);
+    carro.classList.add('andando');
+    sfx.tap();
+  });
+
+  // Tocar no carrinho: buzina e troca de veículo.
+  v.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    ultimoToque = Date.now();
+    vi = (vi + 1) % VEICULOS.length;
+    const novo = VEICULOS[vi];
+    v.textContent = novo.e;
+    restart(v, 'hit');
+    buzinar(novo);
+    say(`${cap(novo.a)} ${novo.n}!`, 500);
+  });
+
+  say('Toque para o carrinho andar!');
+  const convite = setInterval(() => {
+    if (Date.now() - ultimoToque < 5000 || alvo) return;
+    restart(v, 'hit');
+    buzinar(VEICULOS[vi]);
+  }, 5000);
+
+  return () => {
+    cancelAnimationFrame(raf);
+    clearInterval(convite);
+    ronco.gain.setTargetAtTime(0, a.currentTime, 0.05);
+    motor.stop(a.currentTime + 0.3);
+  };
 }
 
 /* ---------- Proteções para mãozinhas curiosas ---------- */

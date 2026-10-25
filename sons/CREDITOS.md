@@ -8,7 +8,7 @@ As versões editadas seguem a mesma licença do original.
 |---|---|---|---|
 | vaca.mp3 | [Single Cow Moo.ogg](https://commons.wikimedia.org/wiki/File:Single_Cow_Moo.ogg) | MichaeltheFox8621 | CC BY-SA 4.0 |
 | cachorro.mp3 | [Barking of a dog.ogg](https://commons.wikimedia.org/wiki/File:Barking_of_a_dog.ogg) | Amada44 | CC BY-SA 3.0 |
-| gato.mp3 | [Meow of a Siamese cat - freemaster2.wav](https://commons.wikimedia.org/wiki/File:Meow_of_a_Siamese_cat_-_freemaster2.wav) | freemaster2 | CC0 |
+| gato.mp3 | [Felis silvestris catus meows.ogg](https://commons.wikimedia.org/wiki/File:Felis_silvestris_catus_meows.ogg) (duas miadas) | Tobias Puderer | CC BY-SA 3.0 |
 | porco.mp3 | [Mudchute pig 1](https://commons.wikimedia.org/wiki/File:Mudchute_pig_1.ogg), [2](https://commons.wikimedia.org/wiki/File:Mudchute_pig_2.ogg), [3](https://commons.wikimedia.org/wiki/File:Mudchute_pig_3.ogg) | Secretlondon | CC BY-SA 3.0 |
 | galinha.mp3 | [Hen announcing shes lain an egg.ogg](https://commons.wikimedia.org/wiki/File:Hen_announcing_shes_lain_an_egg.ogg) | alys | Domínio público |
 | pato.mp3 | [Anas platyrhynchos - Mallard XC62258.mp3](https://commons.wikimedia.org/wiki/File:Anas_platyrhynchos_-_Mallard_XC62258.mp3) | Jonathon Jongsma | CC BY-SA 3.0 |

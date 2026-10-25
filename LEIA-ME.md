@@ -11,6 +11,7 @@ Funciona **sem internet** depois de instalado, em tela cheia e deitado (paisagem
 | 🫧 | **Bolhas** — bolhas sobem devagar; tocar estoura (toque perto também vale) | coordenação olho-mão |
 | 🎨 | **Pintar** — pintar com o dedo; as bolinhas de cor falam o nome da cor | cores, coordenação motora |
 | 🎹 | **Música** — xilofone colorido; arrastar o dedo toca várias notas | causa e efeito, música |
+| 🚗 | **Carrinho** — toca em qualquer lugar e o carrinho vai até lá; chegando na casa, escola, vaca… ele fala onde chegou. Tocar no carrinho buzina e troca de veículo (ônibus, bombeiro, trator, ambulância) | causa e efeito, noção de espaço, vocabulário |
 | 🙈 | **Cadê?** — toca na cortina, ela sobe e aparece um bicho ou brinquedo: "Achou o gato!" | permanência do objeto (esconde-esconde) |
 
 Não existe "errar": todo toque dá som, cor e animação.

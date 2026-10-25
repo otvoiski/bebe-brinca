@@ -1,5 +1,5 @@
 // Guarda todos os arquivos no aparelho para o app funcionar sem internet.
-const CACHE = 'bebe-brinca-v2';
+const CACHE = 'bebe-brinca-v3';
 const SONS = ['abelha', 'cachorro', 'cavalo', 'coruja', 'elefante', 'galinha', 'gato',
   'leao', 'macaco', 'ovelha', 'pato', 'porco', 'sapo', 'vaca'].map(n => `sons/${n}.mp3`);
 const FILES = [
